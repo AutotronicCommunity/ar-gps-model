@@ -2,9 +2,9 @@
 <html>
   <head>
     <meta charset="utf-8" />
-    <title>AR GPS Model</title>
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    
+    <title>GPS AR Model Viewer</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+
     <!-- A-Frame + AR.js + GPS -->
     <script src="https://aframe.io/releases/1.2.0/aframe.min.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/aframe-extras@6.1.1/dist/aframe-extras.min.js"></script>
@@ -12,31 +12,35 @@
     <script src="https://unpkg.com/aframe-gps-entity-place/dist/aframe-gps-entity-place.min.js"></script>
 
     <style>
-      body, html { margin: 0; padding: 0; overflow: hidden; }
+      body, html {
+        margin: 0;
+        padding: 0;
+        overflow: hidden;
+        font-family: sans-serif;
+      }
       #loading {
         position: absolute;
         top: 10px;
         left: 10px;
+        z-index: 999;
         padding: 10px;
-        background: rgba(0,0,0,0.6);
-        color: white;
-        font-family: sans-serif;
-        z-index: 10;
+        background: rgba(0, 0, 0, 0.7);
+        color: #fff;
+        border-radius: 8px;
       }
     </style>
   </head>
-
   <body>
-    <div id="loading">📍 Mengambil lokasi GPS... Dekatkan ke titik koordinat -8.2241, 114.3749</div>
+    <div id="loading">⏳ Menunggu inisialisasi kamera dan lokasi...</div>
 
-    <a-scene 
-      vr-mode-ui="enabled: false" 
+    <a-scene
+      vr-mode-ui="enabled: false"
       embedded
       arjs="sourceType: webcam; gpsMinAccuracy: 100; debugUIEnabled: false;"
     >
       <a-camera gps-camera rotation-reader></a-camera>
 
-      <!-- MODEL 3D AKTIF DI KOORDINAT INI -->
+      <!-- Model 3D akan muncul di koordinat berikut -->
       <a-entity
         gps-entity-place="latitude: -8.2241; longitude: 114.3749;"
         gltf-model="https://cdn.glitch.global/5a88fe2d-cf57-45e1-97c0-75860f1831f5/astronaut.glb?v=1684350441444"
@@ -47,9 +51,26 @@
     </a-scene>
 
     <script>
-      // Update status loading
-      window.addEventListener('gps-camera-update-position', (e) => {
-        document.getElementById('loading').innerHTML = `📍 Lokasi Anda: (${e.detail.position.latitude.toFixed(5)}, ${e.detail.position.longitude.toFixed(5)})`;
+      // Kamera berhasil diinisialisasi
+      window.addEventListener("camera-init", () => {
+        console.log("✅ Kamera berhasil diinisialisasi.");
+        document.getElementById("loading").innerText = "📡 Menunggu lokasi GPS...";
+      });
+
+      // Kamera gagal diakses
+      window.addEventListener("camera-error", (error) => {
+        console.error("❌ Gagal mengakses kamera:", error);
+        document.getElementById("loading").innerText =
+          "❌ Gagal mengakses kamera. Silakan izinkan akses kamera di browser.";
+        alert("❌ Kamera tidak bisa digunakan. Pastikan sudah mengizinkan akses kamera di browser dan buka halaman ini lewat HTTPS.");
+      });
+
+      // Lokasi GPS berhasil diperoleh
+      window.addEventListener("gps-camera-update-position", (e) => {
+        const lat = e.detail.position.latitude.toFixed(5);
+        const lon = e.detail.position.longitude.toFixed(5);
+        console.log("📍 Lokasi terkini:", lat, lon);
+        document.getElementById("loading").innerText = `📍 Lokasi Anda: ${lat}, ${lon}`;
       });
     </script>
   </body>
