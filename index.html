@@ -2,7 +2,7 @@
 <html>
 <head>
     <meta charset="utf-8">
-    <title>AR GPS MODEL</title>
+    <title>AR GPS with 3D Box</title>
     <script src="https://aframe.io/releases/1.2.0/aframe.min.js"></script>
     <script src="https://raw.githack.com/AR-js-org/AR.js/master/aframe/build/aframe-ar-nft.js"></script>
     <style>
@@ -16,69 +16,107 @@
             border-radius: 5px;
             z-index: 99999;
         }
+        /* Kontrol zoom */
+        .zoom-controls {
+            position: fixed;
+            bottom: 20px;
+            right: 20px;
+            background: rgba(0,0,0,0.5);
+            padding: 10px;
+            border-radius: 50%;
+        }
+        .zoom-btn {
+            color: white;
+            font-size: 24px;
+            cursor: pointer;
+            margin: 5px;
+            padding: 10px;
+        }
     </style>
 </head>
 <body>
     <div class="debug-info" id="debug"></div>
+    <div class="zoom-controls">
+        <div class="zoom-btn" onclick="zoomIn()">+</div>
+        <div class="zoom-btn" onclick="zoomOut()">-</div>
+    </div>
 
     <a-scene vr-mode-ui="enabled: false" arjs="sourceType: webcam; debugUIEnabled: false">
-        <a-camera gps-camera rotation-reader></a-camera>
+        <a-camera id="main-camera" gps-camera rotation-reader fov="80"></a-camera>
         
-        <!-- Target lokasi (akan muncul dalam radius 50m) -->
-        <a-image 
-            id="ar-marker"
-            src="https://raw.githubusercontent.com/AR-js-org/AR.js/master/data/images/hiro.png"
-            scale="20 20 20"
+        <!-- Kotak 3D -->
+        <a-box 
+            id="ar-box"
+            color="#4CC3D9"
+            width="1"
+            height="1"
+            depth="1"
+            scale="5 5 5"
+            position="0 0.5 0"
+            rotation="0 45 45"
             gps-entity-place="latitude: -8.2241; longitude: 114.3749;"
             visible="false">
-        </a-image>
+        </a-box>
     </a-scene>
 
     <script>
-        // Koordinat target (Ganti dengan koordinat Anda)
+        // Konfigurasi
         const targetLat = -8.2241;
         const targetLng = 114.3749;
         const radius = 50; // dalam meter
+        const minFov = 30;
+        const maxFov = 100;
+        let currentFov = 80;
 
         // Elements
         const debugElement = document.getElementById('debug');
-        const arMarker = document.getElementById('ar-marker');
+        const arBox = document.getElementById('ar-box');
+        const camera = document.getElementById('main-camera');
 
-        // Fungsi menghitung jarak menggunakan Haversine formula
+        // Fungsi zoom
+        function zoomIn() {
+            currentFov = Math.max(currentFov - 10, minFov);
+            camera.setAttribute('camera', 'fov', currentFov);
+            updateDebugInfo();
+        }
+
+        function zoomOut() {
+            currentFov = Math.min(currentFov + 10, maxFov);
+            camera.setAttribute('camera', 'fov', currentFov);
+            updateDebugInfo();
+        }
+
+        // Fungsi update info debug
+        function updateDebugInfo() {
+            debugElement.innerHTML = `Jarak: ${Math.round(lastDistance)}m<br>
+                                    FOV: ${currentFov}°`;
+        }
+
+        // Fungsi jarak Haversine
         function calculateDistance(lat1, lon1, lat2, lon2) {
-            const R = 6371e3; // Earth radius in meters
+            const R = 6371e3;
             const φ1 = lat1 * Math.PI/180;
             const φ2 = lat2 * Math.PI/180;
             const Δφ = (lat2-lat1) * Math.PI/180;
             const Δλ = (lon2-lon1) * Math.PI/180;
 
-            const a = Math.sin(Δφ/2) * Math.sin(Δφ/2) +
-                      Math.cos(φ1) * Math.cos(φ2) *
-                      Math.sin(Δλ/2) * Math.sin(Δλ/2);
-            const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1-a));
-
-            return R * c;
+            const a = Math.sin(Δφ/2) ** 2 + Math.cos(φ1) * Math.cos(φ2) * Math.sin(Δλ/2) ** 2;
+            return R * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1-a));
         }
 
-        // Get GPS position
+        // Tracking GPS
         if (navigator.geolocation) {
             navigator.geolocation.watchPosition(
                 (position) => {
                     const userLat = position.coords.latitude;
                     const userLng = position.coords.longitude;
-                    const distance = calculateDistance(userLat, userLng, targetLat, targetLng);
+                    lastDistance = calculateDistance(userLat, userLng, targetLat, targetLng);
 
-                    debugElement.innerHTML = `Jarak dari target: ${Math.round(distance)}m`;
-
-                    // Tampilkan AR marker jika dalam radius
-                    if (distance <= radius) {
-                        arMarker.setAttribute('visible', true);
-                    } else {
-                        arMarker.setAttribute('visible', false);
-                    }
+                    arBox.setAttribute('visible', lastDistance <= radius);
+                    updateDebugInfo();
                 },
                 (error) => {
-                    console.error('Error getting GPS:', error);
+                    console.error('GPS Error:', error);
                     debugElement.innerHTML = 'GPS Error: ' + error.message;
                 },
                 {
@@ -88,8 +126,41 @@
                 }
             );
         } else {
-            alert('Geolocation tidak didukung di browser ini');
+            alert('Browser tidak mendukung geolocation');
         }
+
+        // Pinch zoom untuk mobile
+        let initialDistance = null;
+
+        function handleTouch(e) {
+            if (e.touches.length === 2) {
+                e.preventDefault();
+                const touch1 = e.touches[0];
+                const touch2 = e.touches[1];
+                const currentDistance = Math.hypot(
+                    touch2.clientX - touch1.clientX,
+                    touch2.clientY - touch1.clientY
+                );
+
+                if (!initialDistance) {
+                    initialDistance = currentDistance;
+                } else {
+                    const ratio = currentDistance / initialDistance;
+                    currentFov = Math.min(maxFov, Math.max(minFov, currentFov * (1 - (ratio - 1))));
+                    camera.setAttribute('camera', 'fov', currentFov);
+                    updateDebugInfo();
+                }
+            }
+        }
+
+        document.addEventListener('touchstart', (e) => {
+            if (e.touches.length === 2) initialDistance = null;
+        });
+
+        document.addEventListener('touchmove', handleTouch);
+        document.addEventListener('touchend', () => {
+            initialDistance = null;
+        });
     </script>
 </body>
 </html>
