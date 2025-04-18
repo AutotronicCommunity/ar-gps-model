@@ -2,9 +2,10 @@
 <html>
 <head>
     <meta charset="utf-8">
-    <title>AR GPS Scaling</title>
+    <title>AR GPS Image Scaling</title>
     <script src="https://aframe.io/releases/1.2.0/aframe.min.js"></script>
     <script src="https://raw.githack.com/AR-js-org/AR.js/master/aframe/build/aframe-ar-nft.js"></script>
+    <script src="https://unpkg.com/aframe-look-at-component@0.8.0/dist/aframe-look-at-component.min.js"></script>
     <style>
         .debug-info {
             position: fixed;
@@ -22,19 +23,19 @@
     <div class="debug-info" id="debug"></div>
 
     <a-scene vr-mode-ui="enabled: false" arjs="sourceType: webcam; debugUIEnabled: false">
-        <a-camera gps-camera rotation-reader></a-camera>
+        <a-camera id="main-camera" gps-camera rotation-reader></a-camera>
         
-        <!-- Kotak 3D -->
-        <a-box 
+        <!-- Gambar AR -->
+        <a-image 
             id="ar-box"
-            color="#00FF00"
-            width="1"
-            height="1"
-            depth="1"
-            material="opacity: 0.9;"
+            src="https://assets.promediateknologi.id/crop/0x0:0x0/0x0/webp/photo/p2/75/2023/09/06/Tar-smk-gajah-mada-3495940400.jpg"
+            width="4"
+            height="3"
+            look-at="#main-camera"
+            material="side: double"
             gps-entity-place="latitude: -8.2241; longitude: 114.3749;"
             visible="false">
-        </a-box>
+        </a-image>
     </a-scene>
 
     <script>
@@ -55,7 +56,6 @@
             if (distance <= minDistance) return maxScale;
             if (distance >= maxDistance) return baseScale;
             
-            // Skala mengikuti kurva eksponensial terbalik
             const scaleRange = maxScale - baseScale;
             const distanceRatio = (maxDistance - distance) / (maxDistance - minDistance);
             return baseScale + (scaleRange * Math.pow(distanceRatio, 0.5));
@@ -81,11 +81,9 @@
                     const userLng = position.coords.longitude;
                     const distance = calculateDistance(userLat, userLng, targetLat, targetLng);
 
-                    // Update debug info
                     debugElement.innerHTML = `Jarak: ${Math.round(distance)}m<br>
                                             Skala: ${calculateScale(distance).toFixed(1)}`;
 
-                    // Kontrol visibilitas dan skala
                     if (distance <= maxDistance) {
                         const scale = calculateScale(distance);
                         arBox.setAttribute('visible', true);
